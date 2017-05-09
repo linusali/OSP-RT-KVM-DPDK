@@ -1,0 +1,82 @@
+heat_template_version: 2014-10-16
+
+
+description: >
+  Example extra config for post-deployment
+
+
+parameters:
+  servers:
+    type: json
+  ComputeHostnameFormat:
+    type: string
+    default: ""
+  NeutronDpdkCoreList:
+    type: string
+
+
+resources:
+  ExtraDeployments:
+    type: OS::Heat::StructuredDeployments
+    properties:
+      servers:  {get_param: servers}
+      config: {get_resource: ExtraConfig}
+      actions: ['CREATE'] # Only do this on CREATE
+
+
+  ExtraConfig:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config:
+        str_replace:
+          template: |
+            #!/bin/bash
+            core_mask=''
+            get_core_mask()
+            {
+                list=$1
+                declare -a bm
+                bm=(0 0 0 0 0 0 0 0 0 0)
+                max_idx=0
+                for core in $(echo $list | sed 's/,/ /g')
+                do
+                    index=$(($core/32))
+                    temp=$((1<<$core))
+                    bm[$index]=$((${bm[$index]} | $temp))
+                    if [ $max_idx -lt $index ]; then
+                       max_idx=$index
+                    fi
+                done
+
+
+                printf -v core_mask "%x" "${bm[$max_idx]}"
+                for ((i=$max_idx-1;i>=0;i--));
+                do
+                    printf -v hex "%08x" "${bm[$i]}"
+                    core_mask+=$hex
+                done
+                return 0
+            }
+
+
+            set -x
+            FORMAT=$COMPUTE_HOSTNAME_FORMAT
+            if [[ -z $FORMAT ]] ; then
+              FORMAT="compute" ;
+            else
+              # Assumption: only %index% and %stackname% are the variables in Host name format
+              FORMAT=$(echo $FORMAT | sed  's/\%index\%//g' | sed 's/\%stackname\%//g') ;
+            fi
+            if [[ $(hostname) == *$FORMAT* ]] ; then
+              get_core_mask $DPDK_PMD_CORES
+              ovs-vsctl set Open_vSwitch . other_config:pmd-cpu-mask=F0
+              #sed -ri '/^DPDK_OPTIONS/s/-l [0-9\,]+ /-l 0 /' /etc/sysconfig/openvswitch
+              systemctl daemon-reload
+              systemctl restart openvswitch
+              yum install -y kernel-rt-kvm tuned-profiles-realtime
+              sleep 10 && reboot
+            fi
+          params:
+            $DPDK_PMD_CORES: {get_param: NeutronDpdkCoreList}
+            $COMPUTE_HOSTNAME_FORMAT: {get_param: ComputeHostnameFormat}

@@ -1,0 +1,75 @@
+#This file is an example of an environment file for defining the isolated
+#networks and related parameters.
+resource_registry:
+  # Network Interface templates to use (these files must exist)
+  OS::TripleO::Compute::Net::SoftwareConfig:  ./nic-configs/compute.yaml
+  OS::TripleO::Controller::Net::SoftwareConfig: ./nic-configs/controller.yaml
+  OS::TripleO::ComputeUserData: compute-first-boot.yaml
+  OS::TripleO::ComputeExtraConfigPost: compute-post-install.yaml
+
+parameter_defaults:
+  CeilometerStoreEvents: true
+  # This section is where deployment-specific configuration is done
+  # Customize the IP subnets to match the local environment
+  InternalApiNetCidr: 10.1.0.0/24
+  TenantNetCidr: 10.2.0.0/24
+  ExternalNetCidr: 192.168.37.0/24
+  #StorageNetCidr: 10.3.0.0/24
+  #StorageMgmtNetCidr: 10.4.0.0/24
+  # CIDR subnet mask length for provisioning network
+  ControlPlaneSubnetCidr: "24"
+  # Customize the IP ranges on each network to use for static IPs and VIPs
+  InternalApiAllocationPools: [{'start': '10.1.0.10', 'end': '10.1.0.200'}]
+  TenantAllocationPools: [{'start': '10.2.0.10', 'end': '10.2.0.200'}]
+  #StorageAllocationPools: [{'start': '10.3.0.100', 'end': '10.3.0.200'}]
+  #StorageMgmtAllocationPools: [{'start': '10.4.0.100', 'end': '10.4.0.200'}]
+  # Leave room if the external network is also used for floating IPs
+  ExternalAllocationPools: [{'start': '192.168.37.50', 'end': '192.168.37.70'}]
+  # Gateway router for the external network
+  ExternalInterfaceDefaultRoute: 192.168.37.199
+  # Gateway router for the provisioning network (or Undercloud IP)
+  ControlPlaneDefaultRoute: 192.168.111.1
+  # Generally the IP of the Undercloud
+  EC2MetadataIp: 192.168.111.1
+  # Define the DNS servers (maximum 2) for the overcloud nodes
+  DnsServers: ["8.8.8.8","8.8.4.4"]
+  # Customize the VLAN IDs to match the local environment
+  InternalApiNetworkVlanID: 110
+  TenantNetworkVlanID: 120
+  StorageNetworkVlanID: 130
+  StorageMgmtNetworkVlanID: 140
+  # Set to empty string to enable multiple external networks or VLANs
+  NeutronExternalNetworkBridge: "''"
+  NeutronFlatNetworks: '*'
+  NeutronTunnelTypes: ''
+  NeutronNetworkType: 'vlan'
+  NeutronBridgeMappings: 'datacentre:br-ex,dpdk0:br-link0,dpdk1:br-link1'
+
+  # # # # #
+  # OVS DPDK Config
+  # # # # #
+  # List of cores to be used for DPDK Poll Mode Driver
+  NeutronDpdkCoreList: "'2,3'"
+  # Number of memory channels to be used for DPDK
+  NeutronDpdkMemoryChannels: "4"
+  # NeutronDpdkSocketMemory
+  NeutronDpdkSocketMemory: "1024"
+  # NeutronDpdkDriverType
+  NeutronDpdkDriverType: "vfio-pci"
+  # Datapath type for ovs bridges
+  NeutronDatapathType: "netdev"
+  # The vhost-user socket directory
+  NeutronVhostuserSocketDir: "/var/run/openvswitch"
+
+  # Reserved RAM for host processes
+  NovaReservedHostMemory: 2048
+  # A list or range of physical CPU cores to reserve for virtual machine processes.
+  # Example: NovaVcpuPinSet: ['4-12','^8'] will reserve cores from 4-12 excluding 8
+  NovaVcpuPinSet: "8-13"
+  # An array of filters used by Nova to filter a node.These filters will be applied in the order they are listed,
+  # so place your most restrictive filters first to make the filtering process more efficient.
+  NovaSchedulerDefaultFilters: "RamFilter,ComputeFilter,AvailabilityZoneFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,PciPassthroughFilter,NUMATopologyFilter"
+  # Kernel arguments for Compute node
+  ComputeKernelArgs: "default_hugepagesz=1GB hugepagesz=1G hugepages=24 iommu=pt intel_iommu=on isolcpus=4-13 nohz_full=4-13 rcu_nocbs=4-13 intel_pstate=disable"
+
+  ## End of DPDK config.
